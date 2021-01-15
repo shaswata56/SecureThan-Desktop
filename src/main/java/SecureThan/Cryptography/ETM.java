@@ -17,11 +17,14 @@
  */
 package SecureThan.Cryptography;
 
+import SecureThan.Hashing.SHA3;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Arrays;
+import java.util.Base64;
 
 /**
  *
@@ -29,15 +32,22 @@ import java.util.Arrays;
  */
 public class ETM {
 
+    private final RSA rsa;
     private final AES aes;
     private final HMAC hmac;
+    private final String peerName;
+    private final int keyLen, macLen, hashLen;
 
-    public ETM (AES aes, HMAC hmac) {
+    public ETM (AES aes, HMAC hmac, RSA rsaUtil, String peerName) {
+        rsa = rsaUtil;
         this.aes = aes;
         this.hmac = hmac;
+        this.peerName = peerName;
+        keyLen = this.aes.getEncryptionKey().length;
+        hashLen = macLen = 64;
     }
 
-    private byte[] concatByteArray (byte[] array1, byte[] array2) {
+    public byte[] concatByteArray (byte[] array1, byte[] array2) {
         byte[] finalByteArray = new byte[array1.length + array2.length];
 
         System.arraycopy(array1, 0, finalByteArray, 0, array1.length);
@@ -63,14 +73,14 @@ public class ETM {
         return encrypt(concatByteArray(sign, fileBytes));
     }
 
-    public byte[] encrypt (byte[] plainText) {
+    private byte[] encrypt (byte[] plainText) {
         byte[] encrypted = aes.encrypt(plainText);
         byte[] hashed = hmac.getMAC(encrypted);
         return concatByteArray(hashed, encrypted);
     }
 
     public String decrypt (byte[] cipherText) {
-        int hmacLen = 64;
+        int hmacLen = macLen;
         byte[] hmacByte = new byte[hmacLen];
         byte[] encrypted = new byte[cipherText.length - hmacLen];
         String displayable = "";
@@ -92,7 +102,7 @@ public class ETM {
 
             if (Arrays.equals(signature, "s:".getBytes())) {
                 System.arraycopy(decrypted, signLen, byteString, 0, byteString.length);
-                displayable = new String(byteString) + "\n";
+                displayable = peerName + ": " + new String(byteString) + "\n";
             } else if (Arrays.equals(signature, "f:".getBytes())) {
                 int nameLen = 0;
                 
@@ -122,5 +132,39 @@ public class ETM {
         }
 
         return displayable;
+    }
+
+    public byte[] getEncodedCredentials () {
+        SHA3 sha3 = new SHA3();
+        byte[] myKey = rsa.encrypt(concatByteArray(sha3.getHashed(peerName), aes.getEncryptionKey()));
+        byte[] secretMac = hmac.getMAC(myKey);
+        byte[] keyWithMac = concatByteArray(secretMac, myKey);
+        return Base64.getEncoder().encode(keyWithMac);
+    }
+
+    public void setEncodedCredentials (byte[] encodedCredentials) {
+        byte[] decodedCredentials = Base64.getDecoder().decode(encodedCredentials);
+        byte[] mac = new byte[macLen];
+        byte[] decryptionKey = new byte[decodedCredentials.length - macLen];
+
+        System.arraycopy(decodedCredentials, 0, mac, 0, macLen);
+        System.arraycopy(decodedCredentials, macLen, decryptionKey, 0, decryptionKey.length);
+
+        boolean authentic = hmac.checkMAC(decryptionKey, mac);
+
+        if (authentic) {
+            byte[] keyWithHash = rsa.decrypt(decryptionKey);
+            byte[] peerHash = new byte[hashLen];
+            byte[] key = new byte[keyLen];
+
+            System.arraycopy(keyWithHash, 0, peerHash, 0, hashLen);
+            System.arraycopy(keyWithHash, hashLen, key, 0, keyLen);
+
+            SHA3 sha3 = new SHA3();
+
+            if (sha3.getHashed(peerName) == peerHash) {
+                aes.setDecryptionKey(key);
+            }
+        }
     }
 }

@@ -17,18 +17,14 @@
  */
 package SecureThan.Cryptography;
 
-import java.security.InvalidKeyException;
-import java.security.KeyFactory;
-import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.X509EncodedKeySpec;
-import java.util.Base64;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import java.security.*;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
 
 /**
  *
@@ -36,6 +32,7 @@ import javax.crypto.NoSuchPaddingException;
  */
 public class RSA {
 
+    private PublicKey peerKey;
     private final PublicKey publicKey;
     private final  PrivateKey privateKey;
 
@@ -48,10 +45,23 @@ public class RSA {
         return publicKey;
     }
 
-    public String encrypt(String text, PublicKey key) {
+    public byte[] encrypt (byte[] bytes) {
+        try {
+            Cipher cipher = Cipher.getInstance("RSA/ECB?PKCS1Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, publicKey);
+            return cipher.doFinal();
+        } catch (NoSuchAlgorithmException | InvalidKeyException | NoSuchPaddingException
+                | BadPaddingException | IllegalBlockSizeException e) {
+            throw new RuntimeException(e);
+        } finally {
+            return null;
+        }
+    }
+
+    public String encrypt (String text) {
         try {
             Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, key);
+            cipher.init(Cipher.ENCRYPT_MODE, publicKey);
             return Base64.getEncoder()
                     .encodeToString(cipher.doFinal(text.getBytes()));
         } catch (NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException
@@ -62,7 +72,7 @@ public class RSA {
         }
     }
 
-    public String decrypt(String text) {
+    public String decrypt (String text) {
         try {
             Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             cipher.init(Cipher.DECRYPT_MODE, privateKey);
@@ -75,14 +85,30 @@ public class RSA {
         }
     }
 
-    public PublicKey decodePublicKey(byte[] stored)
-    {
+    public byte[] decrypt (byte[] key) {
+        try {
+            Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipher.init(Cipher.DECRYPT_MODE, privateKey);
+            return cipher.doFinal(key);
+        } catch (NoSuchAlgorithmException | IllegalBlockSizeException | BadPaddingException
+                | InvalidKeyException | NoSuchPaddingException e) {
+            throw new RuntimeException(e);
+        } finally {
+            return null;
+        }
+    }
+
+    public void setPeerKey (byte[] key) {
+        peerKey = decodePublicKey(key);
+    }
+
+    public PublicKey decodePublicKey (byte[] stored) {
         X509EncodedKeySpec spec = new X509EncodedKeySpec(stored);
         KeyFactory fact = null;
         try {
             fact = KeyFactory.getInstance("RSA");
         } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
         try {
             assert fact != null;

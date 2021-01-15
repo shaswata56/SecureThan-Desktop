@@ -17,16 +17,17 @@
  */
 package SecureThan.Client;
 
-import SecureThan.Cryptography.AESKeyGen;
-import SecureThan.Cryptography.RSA;
-import SecureThan.Cryptography.RSAKeyGen;
+import SecureThan.Cryptography.*;
+import SecureThan.Hashing.SHA3;
+
+import javax.swing.*;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.net.Socket;
-import java.security.PublicKey;
+import java.util.Arrays;
 import java.util.Base64;
-import javax.swing.JTextArea;
 
 /**
  *
@@ -38,23 +39,27 @@ public class Manager extends Thread {
     private final int PORT = 5656;
     private DataOutputStream dataOutputStream;
     private DataInputStream dataInputStream;
-    private String serverAddress;
+    private final String serverAddress;
+    private final String peerName;
+    private final String userName;
     private boolean connected;
     private boolean kill;
-    private boolean connection;
     private boolean exchanged;
-    private JTextArea jTextArea;
-    private PublicKey publicKey;
+    private boolean authenticated;
+    private final JTextArea jTextArea;
+    private ETM etm;
+    private HMAC mac;
     private AESKeyGen psk;
     private RSAKeyGen keyGen;
     private RSA rsaUtil;
     
-    Manager(String host, JTextArea jTextArea) {
+    Manager(String host, String peerName, String userName, JTextArea jTextArea) {
         serverAddress = host;
         connected = false;
         kill = false;
-        connection = false;
         exchanged = false;
+        this.userName = userName;
+        this.peerName = peerName;
         this.jTextArea = jTextArea;
     }
     
@@ -65,6 +70,8 @@ public class Manager extends Thread {
                 try {
                     keyGen = new RSAKeyGen();
                     psk = new AESKeyGen();
+                    mac = new HMAC();
+                    SHA3 sha3 = new SHA3();
                     client = new Socket(serverAddress, PORT);
                 } catch(IOException e) {
                     throw new RuntimeException(e);
@@ -77,28 +84,83 @@ public class Manager extends Thread {
             if (!kill) {
                 connected = true;
                 rsaUtil = new RSA(keyGen);
+                AES aes = new AES(psk);
+                etm = new ETM(aes, mac, rsaUtil, peerName);
                 dataOutputStream = new DataOutputStream(client.getOutputStream());
                 dataInputStream = new DataInputStream(client.getInputStream());
             }
             
             while (!kill) {
                 try {
-                    String[] word;
-                    
                     if (exchanged) {
-                        String out = rsaUtil.decrypt(dataInputStream.readUTF());
+                        byte[] cipherText = new byte[dataInputStream.available()];
+                        dataInputStream.readFully(cipherText);
+                        String out = etm.decrypt(cipherText);
                         jTextArea.append(out);
-                        word = out.split(":");
                     } else {
-                        byte[] out = Base64.getEncoder().encode(rsaUtil.getPublicKey().getEncoded());
-                        dataOutputStream.write(out);
-                        dataInputStream.readFully(out);
-                        publicKey = rsaUtil.decodePublicKey(Base64.getDecoder().decode(out));
-                        jTextArea.append(Base64.getEncoder().encodeToString(publicKey.getEncoded()) + "\n");
-                        
+                        if (authenticated) {
+                            byte[] out = Base64.getEncoder().encode(rsaUtil.getPublicKey().getEncoded());
+                            dataOutputStream.write(out);
+                            dataInputStream.readFully(out);
+                            rsaUtil.setPeerKey(Base64.getDecoder().decode(out));
+
+                            byte[] credentials = etm.getEncodedCredentials();
+                            dataOutputStream.write(credentials);
+                            dataInputStream.readFully(credentials);
+                            etm.setEncodedCredentials(credentials);
+
+                            jTextArea.append("Key Exchanged!\nAll communication is now end-to-end encrypted!\n");
+                            exchanged = true;
+                        } else {
+                            byte[] hashName = etm.concatByteArray(userName.getBytes(), peerName.getBytes());
+                            byte[] ackBytes = "OK".getBytes();
+                            byte[] receivedBytes = new byte[ackBytes.length];
+                            dataOutputStream.write(hashName);
+                            dataInputStream.readFully(receivedBytes);
+
+                            if (Arrays.equals(ackBytes, receivedBytes)) {
+                                jTextArea.append("Connected to the server!\nWaiting for "+ peerName + "!");
+                            }
+
+                            dataInputStream.readFully(receivedBytes);
+                            if (Arrays.equals(receivedBytes, "ON".getBytes())) {
+                                jTextArea.append("Connected to "+ peerName + "!");
+                                authenticated = true;
+                            }
+                        }
                     }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
             }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
+    }
+
+    void sendMessage (String text) {
+        if (connected) {
+            byte[] encryptedMessage = etm.encryptString(text);
+            try {
+                dataOutputStream.write(encryptedMessage);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    void sendFile (File f) {
+        if (connected) {
+            byte[] encryptedMessage = etm.encryptFile(f);
+            try {
+                dataOutputStream.write(encryptedMessage);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    void setKill() {
+        kill = true;
     }
 }

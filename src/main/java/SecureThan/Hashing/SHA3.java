@@ -17,7 +17,6 @@
  */
 package SecureThan.Hashing;
 
-import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
@@ -37,14 +36,7 @@ public class SHA3 {
         }
     }
     
-    public String getHashed(String text) {
-        byte[] hashByte = sha3.digest(text.getBytes());
-        BigInteger bigInt = new BigInteger(1, hashByte);
-        StringBuilder hexStr = new StringBuilder(bigInt.toString(16));
-        
-        while (hexStr.length() < 32)
-            hexStr.insert(0, "0");
-        
-        return hexStr.toString();
+    public byte[] getHashed(String text) {
+        return sha3.digest(text.getBytes());
     }
 }
