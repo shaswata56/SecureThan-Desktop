@@ -67,18 +67,19 @@ public class Manager extends Thread {
     public void run() {
         try {
             while (!kill) {
+                keyGen = new RSAKeyGen();
+                psk = new AESKeyGen();
+                mac = new HMAC();
+                SHA3 sha3 = new SHA3();
+
                 try {
-                    keyGen = new RSAKeyGen();
-                    psk = new AESKeyGen();
-                    mac = new HMAC();
-                    SHA3 sha3 = new SHA3();
                     client = new Socket(serverAddress, PORT);
                 } catch(IOException e) {
                     throw new RuntimeException(e);
-                } finally {
-                    if (client.isConnected())
-                        break;
                 }
+
+                if (client.isConnected())
+                    break;
             }
             
             if (!kill) {

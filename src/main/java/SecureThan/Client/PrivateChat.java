@@ -18,6 +18,8 @@
 package SecureThan.Client;
 
 import java.io.File;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.JFileChooser;
 
 /**
@@ -32,6 +34,7 @@ public class PrivateChat extends javax.swing.JFrame {
     public PrivateChat() {
         initComponents();
         jTextArea1.setEditable(false);
+        connect = false;
     }
 
     /**
@@ -74,6 +77,11 @@ public class PrivateChat extends javax.swing.JFrame {
         jTextField1.setBackground(new java.awt.Color(51, 51, 51));
         jTextField1.setFont(new java.awt.Font("Hack Nerd Font", 0, 15)); // NOI18N
         jTextField1.setForeground(new java.awt.Color(255, 255, 255));
+        jTextField1.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jTextField1ActionPerformed(evt);
+            }
+        });
 
         jLabel2.setBackground(new java.awt.Color(0, 0, 0));
         jLabel2.setFont(new java.awt.Font("Hack Nerd Font", 0, 18)); // NOI18N
@@ -92,6 +100,11 @@ public class PrivateChat extends javax.swing.JFrame {
         jTextField3.setBackground(new java.awt.Color(51, 51, 51));
         jTextField3.setFont(new java.awt.Font("Hack Nerd Font", 0, 15)); // NOI18N
         jTextField3.setForeground(new java.awt.Color(255, 255, 255));
+        jTextField3.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jTextField3ActionPerformed(evt);
+            }
+        });
 
         jButton1.setBackground(new java.awt.Color(153, 153, 153));
         jButton1.setFont(new java.awt.Font("Hack Nerd Font", 1, 14)); // NOI18N
@@ -219,8 +232,20 @@ public class PrivateChat extends javax.swing.JFrame {
     }//GEN-LAST:event_jButton3ActionPerformed
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
-        // TODO add your handling code here:
+        connect = !connect;
+        if (connect)
+            jButton1.setText("Disconnect");
+        else
+            jButton1.setText("Connect");
     }//GEN-LAST:event_jButton1ActionPerformed
+
+    private void jTextField1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jTextField1ActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_jTextField1ActionPerformed
+
+    private void jTextField3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jTextField3ActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_jTextField3ActionPerformed
 
     /**
      * @param args the command line arguments
@@ -249,15 +274,35 @@ public class PrivateChat extends javax.swing.JFrame {
         }
         //</editor-fold>
 
-        /* Create and display the form */
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            public void run() {
-                new PrivateChat().setVisible(true);
+        PrivateChat app = new PrivateChat();
+        app.setVisible(true);
+        Manager commThread = null;
+        
+        while (app.isEnabled()) {
+            if (app.connect && commThread == null) {
+                commThread = new Manager(app.jTextField3.getText(), app.jTextField2.getText(), app.jTextArea1.getText(), app.jTextArea1);
+                commThread.start();
+                System.out.println("connect");
+            } else if (commThread != null && !app.connect) {
+                try {
+                    commThread.setKill();
+                    commThread.join();
+                    commThread = null;
+                    System.out.println("disconnect");
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
-        });
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     private File f;
+    private boolean connect;
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton jButton1;
     private javax.swing.JButton jButton2;
