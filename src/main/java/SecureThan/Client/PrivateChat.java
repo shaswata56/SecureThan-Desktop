@@ -18,8 +18,8 @@
 package SecureThan.Client;
 
 import java.io.File;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JFileChooser;
 
 /**
@@ -30,8 +30,10 @@ public class PrivateChat extends javax.swing.JFrame {
 
     /**
      * Creates new form PrivateChat
+     * @param commThread
      */
-    public PrivateChat() {
+    public PrivateChat(AtomicReference<Manager> commThread) {
+        this.commThread = commThread;
         initComponents();
         jTextArea1.setEditable(false);
         connect = false;
@@ -220,15 +222,21 @@ public class PrivateChat extends javax.swing.JFrame {
 
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
         jButton2.setEnabled(false);
+        commThread.get().sendMessage(jTextField4.getText());
+        jTextField4.setText("");
+        jButton2.setEnabled(true);
     }//GEN-LAST:event_jButton2ActionPerformed
 
     private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
+        jButton3.setEnabled(false);
         JFileChooser jfc = new JFileChooser();
         jfc.setFileSelectionMode(JFileChooser.FILES_ONLY);
         if (jfc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             f = jfc.getSelectedFile();
             jButton3.setText(f.getName());
         }
+        commThread.get().sendFile(f);
+        jButton3.setEnabled(true);
     }//GEN-LAST:event_jButton3ActionPerformed
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
@@ -250,7 +258,7 @@ public class PrivateChat extends javax.swing.JFrame {
     /**
      * @param args the command line arguments
      */
-    public static void main(String args[]) {
+    public static void main(String[] args) {
         /* Set the Nimbus look and feel */
         //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
         /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
@@ -274,24 +282,23 @@ public class PrivateChat extends javax.swing.JFrame {
         }
         //</editor-fold>
 
-        PrivateChat app = new PrivateChat();
+        PrivateChat app = new PrivateChat(new AtomicReference<>());
         app.setVisible(true);
-        Manager commThread = null;
+        AtomicBoolean init = new AtomicBoolean(false);
+        //app.commThread.set(new Manager(null, null, null, null));
         
         while (app.isEnabled()) {
-            if (app.connect && commThread == null) {
-                commThread = new Manager(app.jTextField3.getText(), app.jTextField2.getText(), app.jTextArea1.getText(), app.jTextArea1);
-                commThread.start();
-                System.out.println("connect");
-            } else if (commThread != null && !app.connect) {
-                try {
-                    commThread.setKill();
-                    commThread.join();
-                    commThread = null;
-                    System.out.println("disconnect");
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+            if (app.connect && !init.get()) {
+                app.commThread.set(new Manager(app.jTextField3.getText(), app.jTextField2.getText(), app.jTextField1.getText(), app.jTextArea1));
+                app.commThread.get().start();
+                init.set(true);
+            } else if (!app.connect && init.get()) try {
+                app.commThread.get().setKill();
+                app.commThread.get().join();
+                app.commThread.set(new Manager(null, null, null, null));
+                init.set(false);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
             try {
                 Thread.sleep(1);
@@ -303,6 +310,7 @@ public class PrivateChat extends javax.swing.JFrame {
 
     private File f;
     private boolean connect;
+    private AtomicReference<Manager> commThread;
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton jButton1;
     private javax.swing.JButton jButton2;

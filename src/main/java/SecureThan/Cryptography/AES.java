@@ -46,16 +46,17 @@ public class AES {
         } catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
             throw new RuntimeException(e);
         }
-        byte[] myKey = Base64.getDecoder().decode(keyGen.getKey());
-        encryptionKey = new SecretKeySpec(myKey, 0, myKey.length, "AES");
+        encryptionKey = new SecretKeySpec(keyGen.getKey(), 0, keyGen.getKey().length, "AES");
         prng = new SecureRandom();
     }
 
     public void setDecryptionKey (byte[] key) {
         decryptionKey = new SecretKeySpec(key, 0, key.length, "AES");
+        System.out.println(new String(decryptionKey.getEncoded()));
     }
 
     byte[] getEncryptionKey () {
+        System.out.println(new String(encryptionKey.getEncoded()));
         return encryptionKey.getEncoded();
     }
 

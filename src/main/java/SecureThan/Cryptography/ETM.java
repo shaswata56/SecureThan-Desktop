@@ -22,9 +22,13 @@ import SecureThan.Hashing.SHA3;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static java.lang.System.arraycopy;
 
 /**
  *
@@ -35,13 +39,14 @@ public class ETM {
     private final RSA rsa;
     private final AES aes;
     private final HMAC hmac;
-    private final String peerName;
+    private final String peerName, userName;
     private final int keyLen, macLen, hashLen;
 
-    public ETM (AES aes, HMAC hmac, RSA rsaUtil, String peerName) {
+    public ETM (AES aes, HMAC hmac, RSA rsaUtil, String userName, String peerName) {
         rsa = rsaUtil;
         this.aes = aes;
         this.hmac = hmac;
+        this.userName = userName;
         this.peerName = peerName;
         keyLen = this.aes.getEncryptionKey().length;
         hashLen = macLen = 64;
@@ -50,8 +55,8 @@ public class ETM {
     public byte[] concatByteArray (byte[] array1, byte[] array2) {
         byte[] finalByteArray = new byte[array1.length + array2.length];
 
-        System.arraycopy(array1, 0, finalByteArray, 0, array1.length);
-        System.arraycopy(array2, 0, finalByteArray, array1.length, array2.length);
+        arraycopy(array1, 0, finalByteArray, 0, array1.length);
+        arraycopy(array2, 0, finalByteArray, array1.length, array2.length);
 
         return finalByteArray;
     }
@@ -79,17 +84,22 @@ public class ETM {
         return concatByteArray(hashed, encrypted);
     }
 
-    public String decrypt (byte[] cipherText) {
+    public String decrypt (String cText) {
         int hmacLen = macLen;
+        byte[] cipherText = cText.getBytes(StandardCharsets.UTF_8);
+        System.out.println(hmacLen + cipherText.length);
+        System.out.println(hmacLen);
+        System.out.println(cipherText.length);
+
         byte[] hmacByte = new byte[hmacLen];
         byte[] encrypted = new byte[cipherText.length - hmacLen];
-        String displayable = "";
+        AtomicReference<String> displayable = new AtomicReference<>("");
         byte[] decrypted;
 
-        System.arraycopy(cipherText, 0, hmacByte, 0, hmacLen);
-        System.arraycopy(cipherText, hmacLen, encrypted, 0, cipherText.length - hmacLen);
+        arraycopy(cipherText, 0, hmacByte, 0, hmacLen);
+        arraycopy(cipherText, hmacLen, encrypted, 0, cipherText.length - hmacLen);
 
-        boolean untouched = hmac.checkMAC(encrypted, hmacByte);
+        boolean untouched = true;//hmac.checkMAC(encrypted, hmacByte);
 
         if (untouched) {
             String fileName;
@@ -98,14 +108,14 @@ public class ETM {
             byte[] signature = new byte[signLen];
             byte[] byteString = new byte[decrypted.length - signLen];
 
-            System.arraycopy(decrypted, 0, signature, 0, signLen);
+            arraycopy(decrypted, 0, signature, 0, signLen);
 
             if (Arrays.equals(signature, "s:".getBytes())) {
-                System.arraycopy(decrypted, signLen, byteString, 0, byteString.length);
-                displayable = peerName + ": " + new String(byteString) + "\n";
+                arraycopy(decrypted, signLen, byteString, 0, byteString.length);
+                displayable.set(peerName + ": " + new String(byteString) + "\n");
             } else if (Arrays.equals(signature, "f:".getBytes())) {
                 int nameLen = 0;
-                
+
                 for (int i = signLen; i < decrypted.length; i++) {
                     if (decrypted[i] == ":".getBytes()[0]) {
                         nameLen = i - signLen;
@@ -114,12 +124,12 @@ public class ETM {
                 }
 
                 byte[] nameBytes = new byte[nameLen];
-                System.arraycopy(decrypted, signLen, nameBytes, 0, nameLen);
+                arraycopy(decrypted, signLen, nameBytes, 0, nameLen);
                 fileName = new String(nameBytes);
-                displayable = fileName + "saved to Downloads folder!\n";
+                displayable.set(fileName + "saved to Downloads folder!\n");
 
                 byte[] fileBytes = new byte[decrypted.length - signLen - nameLen];
-                System.arraycopy(decrypted, signLen + nameLen, fileBytes, 0, fileBytes.length);
+                arraycopy(decrypted, signLen + nameLen, fileBytes, 0, fileBytes.length);
 
                 try (FileOutputStream fileOutputStream = new FileOutputStream(System.getProperty("user.home") + "/Downloads/" + fileName)) {
                     fileOutputStream.write(fileBytes);
@@ -128,43 +138,41 @@ public class ETM {
                 }
             }
         } else {
-            displayable ="THIS IS AN ATTEMPT FOR DATA MODIFICATION. PLEASE USE A DIFFERENT SERVER OR USE USERNAME HARD TO GUESS!\n";
+            displayable.set("THIS IS AN ATTEMPT FOR DATA MODIFICATION. PLEASE USE A DIFFERENT SERVER OR USE USERNAME HARD TO GUESS!\n");
         }
 
-        return displayable;
+        return displayable.get();
     }
 
-    public byte[] getEncodedCredentials () {
+    public String getEncodedCredentials () {
         SHA3 sha3 = new SHA3();
-        byte[] myKey = rsa.encrypt(concatByteArray(sha3.getHashed(peerName), aes.getEncryptionKey()));
-        byte[] secretMac = hmac.getMAC(myKey);
-        byte[] keyWithMac = concatByteArray(secretMac, myKey);
-        return Base64.getEncoder().encode(keyWithMac);
+        byte[] aesKey = aes.getEncryptionKey();
+        byte[] secretMac = hmac.getSecret();
+        byte[] keyId = concatByteArray(sha3.getHashed(userName), aesKey);
+        return rsa.encrypt(Base64.getEncoder().encodeToString(concatByteArray(secretMac, keyId)));
     }
 
-    public void setEncodedCredentials (byte[] encodedCredentials) {
-        byte[] decodedCredentials = Base64.getDecoder().decode(encodedCredentials);
-        byte[] mac = new byte[macLen];
-        byte[] decryptionKey = new byte[decodedCredentials.length - macLen];
+    public void setEncodedCredentials (String encodedCredentials) {
+        String decrypted = rsa.decrypt(encodedCredentials);
+        byte[] keyWithHash = decrypted.getBytes(StandardCharsets.UTF_8);
+        byte[] peerMAC = new byte[128];
+        byte[] peerHash = new byte[hashLen];
+        byte[] key = new byte[keyWithHash.length - 128 - hashLen];
 
-        System.arraycopy(decodedCredentials, 0, mac, 0, macLen);
-        System.arraycopy(decodedCredentials, macLen, decryptionKey, 0, decryptionKey.length);
+        arraycopy(keyWithHash, 0, peerMAC, 0, 128);
+        arraycopy(keyWithHash, 128, peerHash, 0, hashLen);
+        arraycopy(keyWithHash, 128 + hashLen, key, 0, key.length);
+        hmac.setSecret(peerMAC);
 
-        boolean authentic = hmac.checkMAC(decryptionKey, mac);
+        SHA3 sha3 = new SHA3();
+        System.out.println(new String(peerHash));
+        System.out.println(new String(sha3.getHashed(peerName)));
+        System.out.println(peerName);
 
-        if (authentic) {
-            byte[] keyWithHash = rsa.decrypt(decryptionKey);
-            byte[] peerHash = new byte[hashLen];
-            byte[] key = new byte[keyLen];
-
-            System.arraycopy(keyWithHash, 0, peerHash, 0, hashLen);
-            System.arraycopy(keyWithHash, hashLen, key, 0, keyLen);
-
-            SHA3 sha3 = new SHA3();
-
-            if (sha3.getHashed(peerName) == peerHash) {
-                aes.setDecryptionKey(key);
-            }
+        if (sha3.getHashed(peerName) == peerHash) {
+            aes.setDecryptionKey(key);
+            System.out.println("Oki");
         }
     }
+
 }

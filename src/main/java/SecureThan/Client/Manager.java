@@ -26,6 +26,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
 
@@ -52,6 +53,8 @@ public class Manager extends Thread {
     private AESKeyGen psk;
     private RSAKeyGen keyGen;
     private RSA rsaUtil;
+    private AES aes;
+    private SHA3 sha3;
     
     Manager(String host, String peerName, String userName, JTextArea jTextArea) {
         serverAddress = host;
@@ -70,7 +73,7 @@ public class Manager extends Thread {
                 keyGen = new RSAKeyGen();
                 psk = new AESKeyGen();
                 mac = new HMAC();
-                SHA3 sha3 = new SHA3();
+                sha3 = new SHA3();
 
                 try {
                     client = new Socket(serverAddress, PORT);
@@ -85,8 +88,8 @@ public class Manager extends Thread {
             if (!kill) {
                 connected = true;
                 rsaUtil = new RSA(keyGen);
-                AES aes = new AES(psk);
-                etm = new ETM(aes, mac, rsaUtil, peerName);
+                aes = new AES(psk);
+                etm = new ETM(aes, mac, rsaUtil, userName, peerName);
                 dataOutputStream = new DataOutputStream(client.getOutputStream());
                 dataInputStream = new DataInputStream(client.getInputStream());
             }
@@ -94,33 +97,33 @@ public class Manager extends Thread {
             while (!kill) {
                 try {
                     if (exchanged) {
-                        byte[] cipherText = new byte[dataInputStream.available()];
-                        dataInputStream.readFully(cipherText);
-                        String out = etm.decrypt(cipherText);
+                        String input = dataInputStream.readUTF();
+                        System.out.println(input.length());
+                        String out = etm.decrypt(input);
+                        System.out.println(input);
                         jTextArea.append(out);
                     } else {
                         if (authenticated) {
-                            byte[] out = Base64.getEncoder().encode(rsaUtil.getPublicKey().getEncoded());
-                            dataOutputStream.write(out);
-                            dataInputStream.readFully(out);
-                            rsaUtil.setPeerKey(Base64.getDecoder().decode(out));
+                            String out = Base64.getEncoder().encodeToString(rsaUtil.getPublicKey().getEncoded());
+                            dataOutputStream.writeUTF(out);
+                            String key = dataInputStream.readUTF();
+                            rsaUtil.setPeerKey(Base64.getDecoder().decode(key));
 
-                            byte[] credentials = etm.getEncodedCredentials();
-                            dataOutputStream.write(credentials);
-                            dataInputStream.readFully(credentials);
-                            etm.setEncodedCredentials(credentials);
+                            dataOutputStream.writeUTF(etm.getEncodedCredentials());
+                            String peerCredential = dataInputStream.readUTF();
+                            etm.setEncodedCredentials(peerCredential);
 
-                            jTextArea.append("Key Exchanged!\nAll communication is now end-to-end encrypted!\n");
+                            jTextArea.append("\nKey Exchanged!\nAll communication is now end-to-end encrypted!\n");
                             exchanged = true;
                         } else {
-                            byte[] hashName = etm.concatByteArray(userName.getBytes(), peerName.getBytes());
+                            byte[] hashName = etm.concatByteArray(sha3.getHashed(userName), sha3.getHashed(peerName));
                             byte[] ackBytes = "OK".getBytes();
                             byte[] receivedBytes = new byte[ackBytes.length];
                             dataOutputStream.write(hashName);
                             dataInputStream.readFully(receivedBytes);
 
                             if (Arrays.equals(ackBytes, receivedBytes)) {
-                                jTextArea.append("Connected to the server!\nWaiting for "+ peerName + "!");
+                                jTextArea.append("Connected to the server!\nWaiting for "+ peerName + "!\n");
                             }
 
                             dataInputStream.readFully(receivedBytes);
@@ -143,7 +146,7 @@ public class Manager extends Thread {
         if (connected) {
             byte[] encryptedMessage = etm.encryptString(text);
             try {
-                dataOutputStream.write(encryptedMessage);
+                dataOutputStream.writeUTF(new String(encryptedMessage));
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }

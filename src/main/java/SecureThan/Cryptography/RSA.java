@@ -46,55 +46,48 @@ public class RSA {
     }
 
     public byte[] encrypt (byte[] bytes) {
-        try {
-            Cipher cipher = Cipher.getInstance("RSA/ECB?PKCS1Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, publicKey);
-            return cipher.doFinal();
-        } catch (NoSuchAlgorithmException | InvalidKeyException | NoSuchPaddingException
-                | BadPaddingException | IllegalBlockSizeException e) {
-            throw new RuntimeException(e);
-        } finally {
-            return null;
-        }
-    }
-
-    public String encrypt (String text) {
+        System.out.println(bytes.length);
         try {
             Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             cipher.init(Cipher.ENCRYPT_MODE, publicKey);
-            return Base64.getEncoder()
-                    .encodeToString(cipher.doFinal(text.getBytes()));
-        } catch (NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException
+            return cipher.doFinal(bytes);
+        } catch (NoSuchAlgorithmException | InvalidKeyException | NoSuchPaddingException
                 | BadPaddingException | IllegalBlockSizeException e) {
             throw new RuntimeException(e);
-        } finally {
-            return "";
         }
     }
 
-    public String decrypt (String text) {
+    public String encrypt(String text) {
+        try {
+            Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, peerKey);
+            return Base64.getEncoder().encodeToString(cipher.doFinal(text.getBytes()));
+        } catch (NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException | BadPaddingException | IllegalBlockSizeException e) {
+            e.printStackTrace();
+        }
+        return "";
+    }
+
+    public String decrypt(String text) {
         try {
             Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             cipher.init(Cipher.DECRYPT_MODE, privateKey);
             return new String(cipher.doFinal(Base64.getDecoder().decode(text)));
-        } catch (NoSuchAlgorithmException | IllegalBlockSizeException | BadPaddingException
-                | InvalidKeyException | NoSuchPaddingException e) {
-            throw new RuntimeException(e);
-        } finally {
-            return "";
+        } catch (NoSuchAlgorithmException | IllegalBlockSizeException | BadPaddingException | InvalidKeyException | NoSuchPaddingException e) {
+            e.printStackTrace();
         }
+        return "";
     }
 
     public byte[] decrypt (byte[] key) {
+        System.out.println(key.length);
         try {
             Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-            cipher.init(Cipher.DECRYPT_MODE, privateKey);
+            cipher.init(Cipher.DECRYPT_MODE, peerKey);
             return cipher.doFinal(key);
         } catch (NoSuchAlgorithmException | IllegalBlockSizeException | BadPaddingException
                 | InvalidKeyException | NoSuchPaddingException e) {
             throw new RuntimeException(e);
-        } finally {
-            return null;
         }
     }
 
@@ -108,15 +101,14 @@ public class RSA {
         try {
             fact = KeyFactory.getInstance("RSA");
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
         }
         try {
             assert fact != null;
             return fact.generatePublic(spec);
         } catch (InvalidKeySpecException e) {
-            throw new RuntimeException(e);
-        } finally {
-            return null;
+            e.printStackTrace();
         }
+        return null;
     }
 }

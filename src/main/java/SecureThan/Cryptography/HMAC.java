@@ -59,11 +59,9 @@ public class HMAC {
     }
 
     public void setSecret (byte[] mac) {
-        byte[] secretExternal = Base64.getDecoder().decode(mac);
-
         try {
             String HMAC_SHA512 = "HmacSHA512";
-            SecretKeySpec secretKeySpec = new SecretKeySpec(secretExternal, HMAC_SHA512);
+            SecretKeySpec secretKeySpec = new SecretKeySpec(mac, HMAC_SHA512);
             macPublic = Mac.getInstance(HMAC_SHA512);
             macPublic.init(secretKeySpec);
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
@@ -72,6 +70,6 @@ public class HMAC {
     }
 
     public byte[] getSecret () {
-        return Base64.getEncoder().encode(secretPersonal);
+        return secretPersonal;
     }
 }

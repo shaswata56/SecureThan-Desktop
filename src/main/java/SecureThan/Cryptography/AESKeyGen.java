@@ -42,6 +42,6 @@ public class AESKeyGen {
     }
 
     byte[] getKey () {
-        return Base64.getEncoder().encode(key.getEncoded());
+        return key.getEncoded();
     }
 }
