@@ -52,11 +52,9 @@ public class AES {
 
     public void setDecryptionKey (byte[] key) {
         decryptionKey = new SecretKeySpec(key, 0, key.length, "AES");
-        System.out.println(new String(decryptionKey.getEncoded()));
     }
 
     byte[] getEncryptionKey () {
-        System.out.println(new String(encryptionKey.getEncoded()));
         return encryptionKey.getEncoded();
     }
 

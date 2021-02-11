@@ -64,7 +64,7 @@ public class ETM {
     public byte[] encryptString (String text) {
         byte[] sign = "s:".getBytes();
         byte[] textBytes = text.getBytes();
-        return encrypt(concatByteArray(sign, textBytes));
+        return Base64.getEncoder().encode(encrypt(Base64.getEncoder().encode(concatByteArray(sign, textBytes))));
     }
 
     public byte[] encryptFile (File file) {
@@ -75,7 +75,7 @@ public class ETM {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return encrypt(concatByteArray(sign, fileBytes));
+        return Base64.getEncoder().encode(encrypt(Base64.getEncoder().encode(concatByteArray(sign, fileBytes))));
     }
 
     private byte[] encrypt (byte[] plainText) {
@@ -86,10 +86,7 @@ public class ETM {
 
     public String decrypt (String cText) {
         int hmacLen = macLen;
-        byte[] cipherText = cText.getBytes(StandardCharsets.UTF_8);
-        System.out.println(hmacLen + cipherText.length);
-        System.out.println(hmacLen);
-        System.out.println(cipherText.length);
+        byte[] cipherText = Base64.getDecoder().decode(cText);
 
         byte[] hmacByte = new byte[hmacLen];
         byte[] encrypted = new byte[cipherText.length - hmacLen];
@@ -99,11 +96,11 @@ public class ETM {
         arraycopy(cipherText, 0, hmacByte, 0, hmacLen);
         arraycopy(cipherText, hmacLen, encrypted, 0, cipherText.length - hmacLen);
 
-        boolean untouched = true;//hmac.checkMAC(encrypted, hmacByte);
+        boolean untouched = hmac.checkMAC(encrypted, hmacByte);
 
         if (untouched) {
             String fileName;
-            decrypted = aes.decrypt(encrypted);
+            decrypted = Base64.getDecoder().decode(aes.decrypt(encrypted));
             int signLen = 2;
             byte[] signature = new byte[signLen];
             byte[] byteString = new byte[decrypted.length - signLen];
@@ -153,8 +150,7 @@ public class ETM {
     }
 
     public void setEncodedCredentials (String encodedCredentials) {
-        String decrypted = rsa.decrypt(encodedCredentials);
-        byte[] keyWithHash = decrypted.getBytes(StandardCharsets.UTF_8);
+        byte[] keyWithHash = Base64.getDecoder().decode(rsa.decrypt(encodedCredentials));
         byte[] peerMAC = new byte[128];
         byte[] peerHash = new byte[hashLen];
         byte[] key = new byte[keyWithHash.length - 128 - hashLen];
@@ -165,13 +161,9 @@ public class ETM {
         hmac.setSecret(peerMAC);
 
         SHA3 sha3 = new SHA3();
-        System.out.println(new String(peerHash));
-        System.out.println(new String(sha3.getHashed(peerName)));
-        System.out.println(peerName);
 
-        if (sha3.getHashed(peerName) == peerHash) {
+        if (new String(sha3.getHashed(peerName)).equals(new String(peerHash))) {
             aes.setDecryptionKey(key);
-            System.out.println("Oki");
         }
     }
 

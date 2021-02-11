@@ -98,9 +98,7 @@ public class Manager extends Thread {
                 try {
                     if (exchanged) {
                         String input = dataInputStream.readUTF();
-                        System.out.println(input.length());
                         String out = etm.decrypt(input);
-                        System.out.println(input);
                         jTextArea.append(out);
                     } else {
                         if (authenticated) {

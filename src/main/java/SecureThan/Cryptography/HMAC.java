@@ -22,6 +22,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Scanner;
 
@@ -51,7 +52,7 @@ public class HMAC {
     }
 
     public boolean checkMAC (byte[] data, byte[] mac) {
-        return macPublic.doFinal(data) == mac;
+        return Arrays.toString(mac).equals(Arrays.toString(macPublic.doFinal(data)));
     }
 
     public byte[] getMAC (byte[] data) {
