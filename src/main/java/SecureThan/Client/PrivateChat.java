@@ -132,6 +132,11 @@ public class PrivateChat extends javax.swing.JFrame {
         jTextField4.setBackground(new java.awt.Color(51, 51, 51));
         jTextField4.setFont(new java.awt.Font("Hack Nerd Font", 0, 15)); // NOI18N
         jTextField4.setForeground(new java.awt.Color(255, 255, 255));
+        jTextField4.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jTextField4ActionPerformed(evt);
+            }
+        });
 
         jButton2.setBackground(new java.awt.Color(153, 153, 153));
         jButton2.setFont(new java.awt.Font("Hack Nerd Font", 1, 14)); // NOI18N
@@ -254,8 +259,14 @@ public class PrivateChat extends javax.swing.JFrame {
     }//GEN-LAST:event_jTextField1ActionPerformed
 
     private void jTextField3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jTextField3ActionPerformed
-        // TODO add your handling code here:
+
     }//GEN-LAST:event_jTextField3ActionPerformed
+
+    private void jTextField4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jTextField4ActionPerformed
+        commThread.get().sendMessage(jTextField4.getText());
+        jTextArea1.append(jTextField1.getText()+": "+jTextField4.getText() + "\n");
+        jTextField4.setText("");
+    }//GEN-LAST:event_jTextField4ActionPerformed
 
     /**
      * @param args the command line arguments
@@ -286,6 +297,8 @@ public class PrivateChat extends javax.swing.JFrame {
 
         PrivateChat app = new PrivateChat(new AtomicReference<>());
         app.setVisible(true);
+        app.jTextArea1.setAutoscrolls(true);
+        app.jButton3.setVisible(false);
         AtomicBoolean init = new AtomicBoolean(false);
         //app.commThread.set(new Manager(null, null, null, null));
         
