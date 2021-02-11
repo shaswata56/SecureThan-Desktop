@@ -229,6 +229,7 @@ public class PrivateChat extends javax.swing.JFrame {
         jButton2.setEnabled(false);
         commThread.get().sendMessage(jTextField4.getText());
         jTextArea1.append(jTextField1.getText()+": "+jTextField4.getText() + "\n");
+        jTextArea1.setCaretPosition(jTextArea1.getDocument().getLength());
         jTextField4.setText("");
         jButton2.setEnabled(true);
     }//GEN-LAST:event_jButton2ActionPerformed
@@ -265,6 +266,7 @@ public class PrivateChat extends javax.swing.JFrame {
     private void jTextField4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jTextField4ActionPerformed
         commThread.get().sendMessage(jTextField4.getText());
         jTextArea1.append(jTextField1.getText()+": "+jTextField4.getText() + "\n");
+        jTextArea1.setCaretPosition(jTextArea1.getDocument().getLength());
         jTextField4.setText("");
     }//GEN-LAST:event_jTextField4ActionPerformed
 

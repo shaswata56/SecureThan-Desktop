@@ -100,6 +100,7 @@ public class Manager extends Thread {
                         String input = dataInputStream.readUTF();
                         String out = etm.decrypt(input);
                         jTextArea.append(out);
+                        jTextArea.setCaretPosition(jTextArea.getDocument().getLength());
                     } else {
                         if (authenticated) {
                             String out = Base64.getEncoder().encodeToString(rsaUtil.getPublicKey().getEncoded());
